@@ -30,18 +30,8 @@ if (!EMAIL_USER || !EMAIL_PASS) {
   console.warn("Warning: EMAIL_USER or EMAIL_PASS is not set in the environment.");
 }
 
-// CORS — only needed when frontend and server are on different origins (local dev)
-const FRONTEND_URL = process.env.FRONTEND_URL;
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
-      if (origin.startsWith("http://localhost")) return callback(null, true);
-      if (FRONTEND_URL && origin === FRONTEND_URL) return callback(null, true);
-      return callback(new Error("Not allowed by CORS"));
-    },
-  })
-);
+// Allow all origins — frontend and backend are on the same server in production
+app.use(cors());
 
 app.use(express.json({ limit: "20mb" }));
 
