@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import multer from "multer";
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { fileURLToPath } from "url";
@@ -21,18 +21,16 @@ const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
 
 const PORT = process.env.PORT || 4000;
-const EMAIL_USER = process.env.EMAIL_USER;
-const EMAIL_PASS = process.env.EMAIL_PASS;
+const EMAIL_FROM = process.env.EMAIL_USER;
 const EMAIL_TO = "diego1992aguirre@gmail.com";
 const TIMEZONE = "America/Mexico_City";
 
-if (!EMAIL_USER || !EMAIL_PASS) {
-  console.warn("Warning: EMAIL_USER or EMAIL_PASS is not set in the environment.");
+if (!process.env.RESEND_API_KEY) {
+  console.warn("Warning: RESEND_API_KEY is not set.");
 }
 
-// Allow all origins — frontend and backend are on the same server in production
+// Allow all origins — frontend and backend run on the same server in production
 app.use(cors());
-
 app.use(express.json({ limit: "20mb" }));
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
@@ -93,7 +91,7 @@ async function buildAndSendEmail({ subject, date, time, customMessage, pdfBuffer
     `DTEND;TZID=${TIMEZONE}:${formatLocalDateForICS(endLocal)}`,
     `SUMMARY:${fullTitle}`,
     `DESCRIPTION:${textForEmail.replace(/\n/g, "\\n")}`,
-    `ORGANIZER;CN=Verum Committee:mailto:${EMAIL_USER}`,
+    `ORGANIZER;CN=Verum Committee:mailto:${EMAIL_FROM}`,
     `ATTENDEE;CN=Diego Aguirre;ROLE=REQ-PARTICIPANT;RSVP=TRUE:mailto:${EMAIL_TO}`,
     "END:VEVENT","END:VCALENDAR","",
   ].join("\r\n");
@@ -102,38 +100,33 @@ async function buildAndSendEmail({ subject, date, time, customMessage, pdfBuffer
     ? recipients.filter((v) => typeof v === "string")
     : [EMAIL_TO];
 
-  const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 587,
-    secure: false,
-    auth: { user: EMAIL_USER, pass: EMAIL_PASS },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 20000,
+  const resend = new Resend(process.env.RESEND_API_KEY);
+
+  const { error } = await resend.emails.send({
+    from: `Comité Verum <${EMAIL_FROM}>`,
+    to: toList,
+    subject: fullTitle,
+    html: htmlForEmail,
+    text: textForEmail,
+    attachments: [
+      { filename: pdfFilename, content: pdfBuffer },
+      { filename: "invite.ics", content: Buffer.from(icsContent), contentType: "text/calendar" },
+    ],
   });
 
-  await transporter.sendMail({
-    from: EMAIL_USER,
-    to: toList.join(", "),
-    subject: fullTitle,
-    text: textForEmail,
-    html: htmlForEmail,
-    icalEvent: { filename: "invite.ics", method: "REQUEST", content: icsContent },
-    attachments: [{ filename: pdfFilename, content: pdfBuffer }],
-  });
+  if (error) throw new Error(error.message);
 }
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
 
-// JSON route — used by the frontend (both Railway and local dev without VITE_API_URL)
 app.post("/api/send-email", async (req, res) => {
   try {
     const { subject, date, time, message: customMessage, pdfBase64, pdfFilename, recipients } = req.body;
     if (!subject || !date || !time || !pdfBase64 || !pdfFilename) {
       return res.status(400).json({ error: "Subject, date, time and PDF file are required." });
     }
-    if (!EMAIL_USER || !EMAIL_PASS) {
-      return res.status(500).json({ error: "Email credentials are not configured." });
+    if (!process.env.RESEND_API_KEY) {
+      return res.status(500).json({ error: "RESEND_API_KEY is not configured." });
     }
     await buildAndSendEmail({
       subject, date, time, customMessage,
@@ -143,11 +136,11 @@ app.post("/api/send-email", async (req, res) => {
     return res.status(200).json({ success: true });
   } catch (err) {
     console.error("Error sending email:", err);
-    return res.status(500).json({ error: "Failed to send email." });
+    return res.status(500).json({ error: err.message || "Failed to send email." });
   }
 });
 
-// FormData route — kept for local dev compatibility
+// FormData route — local dev fallback
 app.post("/send-email", upload.single("pdf"), async (req, res) => {
   try {
     const { subject, date, time, message: customMessage, recipients: rawRecipients } = req.body;
@@ -155,8 +148,8 @@ app.post("/send-email", upload.single("pdf"), async (req, res) => {
     if (!subject || !date || !time || !file) {
       return res.status(400).json({ error: "Subject, date, time and PDF file are required." });
     }
-    if (!EMAIL_USER || !EMAIL_PASS) {
-      return res.status(500).json({ error: "Email credentials are not configured." });
+    if (!process.env.RESEND_API_KEY) {
+      return res.status(500).json({ error: "RESEND_API_KEY is not configured." });
     }
     let recipients = [];
     if (typeof rawRecipients === "string") {
@@ -173,11 +166,11 @@ app.post("/send-email", upload.single("pdf"), async (req, res) => {
     return res.json({ success: true });
   } catch (err) {
     console.error("Error sending email:", err);
-    return res.status(500).json({ error: "Failed to send email." });
+    return res.status(500).json({ error: err.message || "Failed to send email." });
   }
 });
 
-// Serve built frontend — for Railway (production)
+// Serve built frontend
 const distPath = join(__dirname, "dist");
 if (existsSync(distPath)) {
   app.use(express.static(distPath));
