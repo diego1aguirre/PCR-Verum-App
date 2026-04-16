@@ -1,5 +1,5 @@
-import PlaceholderCard from '../components/PlaceholderCard'
+import VerumMailPage from '../features/verum-mail/VerumMailPage'
 
 export default function VerumMail() {
-  return <PlaceholderCard title="Verum Mail" />
+  return <VerumMailPage />
 }
