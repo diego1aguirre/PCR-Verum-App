@@ -103,8 +103,13 @@ async function buildAndSendEmail({ subject, date, time, customMessage, pdfBuffer
     : [EMAIL_TO];
 
   const transporter = nodemailer.createTransport({
-    service: "gmail",
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false,
     auth: { user: EMAIL_USER, pass: EMAIL_PASS },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 20000,
   });
 
   await transporter.sendMail({
