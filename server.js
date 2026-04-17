@@ -1,7 +1,6 @@
 import express from "express";
 import cors from "cors";
 import multer from "multer";
-import { Resend } from "resend";
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
@@ -22,12 +21,13 @@ const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
 
 const PORT = process.env.PORT || 4000;
-const EMAIL_FROM = process.env.EMAIL_USER;
+const EMAIL_USER = process.env.EMAIL_USER;
+const EMAIL_PASS = process.env.EMAIL_PASS;
 const EMAIL_TO = "diego1992aguirre@gmail.com";
 const TIMEZONE = "America/Mexico_City";
 
-if (!process.env.RESEND_API_KEY) {
-  console.warn("Warning: RESEND_API_KEY is not set.");
+if (!EMAIL_USER || !EMAIL_PASS) {
+  console.warn("Warning: EMAIL_USER or EMAIL_PASS is not set.");
 }
 
 // Allow all origins — frontend and backend run on the same server in production
@@ -92,7 +92,7 @@ async function buildAndSendEmail({ subject, date, time, customMessage, pdfBuffer
     `DTEND;TZID=${TIMEZONE}:${formatLocalDateForICS(endLocal)}`,
     `SUMMARY:${fullTitle}`,
     `DESCRIPTION:${textForEmail.replace(/\n/g, "\\n")}`,
-    `ORGANIZER;CN=Verum Committee:mailto:${EMAIL_FROM}`,
+    `ORGANIZER;CN=Verum Committee:mailto:${EMAIL_USER}`,
     `ATTENDEE;CN=Diego Aguirre;ROLE=REQ-PARTICIPANT;RSVP=TRUE:mailto:${EMAIL_TO}`,
     "END:VEVENT","END:VCALENDAR","",
   ].join("\r\n");
@@ -101,39 +101,25 @@ async function buildAndSendEmail({ subject, date, time, customMessage, pdfBuffer
     ? recipients.filter((v) => typeof v === "string")
     : [EMAIL_TO];
 
-  if (process.env.RESEND_API_KEY) {
-    // Production (Railway) — send via Resend HTTPS API
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    const { error } = await resend.emails.send({
-      from: `Comité Verum <${EMAIL_FROM}>`,
-      to: toList,
-      subject: fullTitle,
-      html: htmlForEmail,
-      text: textForEmail,
-      attachments: [
-        { filename: pdfFilename, content: pdfBuffer },
-        { filename: "invite.ics", content: Buffer.from(icsContent), contentType: "text/calendar" },
-      ],
-    });
-    if (error) throw new Error(error.message);
-  } else {
-    // Local dev — send via Gmail SMTP
-    const transporter = nodemailer.createTransport({
-      host: "smtp.gmail.com",
-      port: 587,
-      secure: false,
-      auth: { user: EMAIL_FROM, pass: process.env.EMAIL_PASS },
-    });
-    await transporter.sendMail({
-      from: EMAIL_FROM,
-      to: toList.join(", "),
-      subject: fullTitle,
-      html: htmlForEmail,
-      text: textForEmail,
-      icalEvent: { filename: "invite.ics", method: "REQUEST", content: icsContent },
-      attachments: [{ filename: pdfFilename, content: pdfBuffer }],
-    });
-  }
+  const transporter = nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false,
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+  });
+
+  await transporter.sendMail({
+    from: EMAIL_USER,
+    to: toList.join(", "),
+    subject: fullTitle,
+    html: htmlForEmail,
+    text: textForEmail,
+    icalEvent: { filename: "invite.ics", method: "REQUEST", content: icsContent },
+    attachments: [{ filename: pdfFilename, content: pdfBuffer }],
+  });
 }
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
