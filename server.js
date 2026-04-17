@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import multer from "multer";
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { fileURLToPath } from "url";
@@ -21,13 +21,13 @@ const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
 
 const PORT = process.env.PORT || 4000;
-const EMAIL_USER = process.env.EMAIL_USER;
-const EMAIL_PASS = process.env.EMAIL_PASS;
+const EMAIL_USER = process.env.EMAIL_USER;   // real sender — used once domain is verified
+const EMAIL_FROM = "onboarding@resend.dev";  // TODO: switch to EMAIL_USER after DNS verification
 const EMAIL_TO = "diego1992aguirre@gmail.com";
 const TIMEZONE = "America/Mexico_City";
 
-if (!EMAIL_USER || !EMAIL_PASS) {
-  console.warn("Warning: EMAIL_USER or EMAIL_PASS is not set.");
+if (!process.env.RESEND_API_KEY) {
+  console.warn("Warning: RESEND_API_KEY is not set.");
 }
 
 // Allow all origins — frontend and backend run on the same server in production
@@ -101,25 +101,21 @@ async function buildAndSendEmail({ subject, date, time, customMessage, pdfBuffer
     ? recipients.filter((v) => typeof v === "string")
     : [EMAIL_TO];
 
-  const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 587,
-    secure: false,
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
+  const resend = new Resend(process.env.RESEND_API_KEY);
 
-  await transporter.sendMail({
-    from: EMAIL_USER,
-    to: toList.join(", "),
+  const { error } = await resend.emails.send({
+    from: EMAIL_FROM,
+    to: toList,
     subject: fullTitle,
     html: htmlForEmail,
     text: textForEmail,
-    icalEvent: { filename: "invite.ics", method: "REQUEST", content: icsContent },
-    attachments: [{ filename: pdfFilename, content: pdfBuffer }],
+    attachments: [
+      { filename: pdfFilename, content: pdfBuffer },
+      { filename: "invite.ics", content: Buffer.from(icsContent), contentType: "text/calendar" },
+    ],
   });
+
+  if (error) throw new Error(error.message);
 }
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
