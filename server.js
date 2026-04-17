@@ -311,8 +311,18 @@ app.post("/api/comunicado", upload.single("file"), async (req, res) => {
 // Serve built frontend
 const distPath = join(__dirname, "dist");
 if (existsSync(distPath)) {
-  app.use(express.static(distPath));
-  app.get("/{*splat}", (_req, res) => res.sendFile(join(distPath, "index.html")));
+  // Hashed assets (JS/CSS) can be cached forever; index.html must never be cached
+  app.use(express.static(distPath, {
+    setHeaders(res, filePath) {
+      if (filePath.endsWith("index.html")) {
+        res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+      }
+    },
+  }));
+  app.get("/{*splat}", (_req, res) => {
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    res.sendFile(join(distPath, "index.html"));
+  });
 }
 
 app.listen(PORT, () => {
