@@ -171,8 +171,8 @@ app.post("/send-email", upload.single("pdf"), async (req, res) => {
 app.post("/api/merge-pdf", upload.array("files"), async (req, res) => {
   try {
     const files = req.files;
-    if (!files || files.length < 2) {
-      return res.status(400).json({ error: "Se necesitan al menos 2 archivos PDF." });
+    if (!files || files.length < 1) {
+      return res.status(400).json({ error: "Se necesita al menos un archivo PDF." });
     }
 
     const addPageNumbers = req.body.addPageNumbers === "true";

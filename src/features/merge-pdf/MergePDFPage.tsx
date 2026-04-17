@@ -75,8 +75,8 @@ export default function MergePDFPage() {
   // ── Submit ────────────────────────────────────────────────────────────────
 
   async function handleMerge() {
-    if (files.length < 2) {
-      setStatus({ type: "error", msg: "Agrega al menos 2 archivos PDF para combinar." });
+    if (files.length < 1) {
+      setStatus({ type: "error", msg: "Agrega al menos un archivo PDF." });
       return;
     }
 
@@ -143,7 +143,7 @@ export default function MergePDFPage() {
           <p className="mp-drop-label">
             Haz clic o arrastra tus archivos PDF aquí
           </p>
-          <p className="mp-drop-hint">Solo archivos .pdf · Mínimo 2</p>
+          <p className="mp-drop-hint">Solo archivos .pdf</p>
           <input
             ref={inputRef}
             type="file"
@@ -228,7 +228,7 @@ export default function MergePDFPage() {
       <button
         className="mp-btn-submit"
         onClick={handleMerge}
-        disabled={loading || files.length < 2}
+        disabled={loading || files.length < 1}
       >
         {loading ? (
           <>
