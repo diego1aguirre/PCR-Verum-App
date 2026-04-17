@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import multer from "multer";
 import { Resend } from "resend";
+import nodemailer from "nodemailer";
 import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { fileURLToPath } from "url";
@@ -100,21 +101,39 @@ async function buildAndSendEmail({ subject, date, time, customMessage, pdfBuffer
     ? recipients.filter((v) => typeof v === "string")
     : [EMAIL_TO];
 
-  const resend = new Resend(process.env.RESEND_API_KEY);
-
-  const { error } = await resend.emails.send({
-    from: `Comité Verum <${EMAIL_FROM}>`,
-    to: toList,
-    subject: fullTitle,
-    html: htmlForEmail,
-    text: textForEmail,
-    attachments: [
-      { filename: pdfFilename, content: pdfBuffer },
-      { filename: "invite.ics", content: Buffer.from(icsContent), contentType: "text/calendar" },
-    ],
-  });
-
-  if (error) throw new Error(error.message);
+  if (process.env.RESEND_API_KEY) {
+    // Production (Railway) — send via Resend HTTPS API
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const { error } = await resend.emails.send({
+      from: `Comité Verum <${EMAIL_FROM}>`,
+      to: toList,
+      subject: fullTitle,
+      html: htmlForEmail,
+      text: textForEmail,
+      attachments: [
+        { filename: pdfFilename, content: pdfBuffer },
+        { filename: "invite.ics", content: Buffer.from(icsContent), contentType: "text/calendar" },
+      ],
+    });
+    if (error) throw new Error(error.message);
+  } else {
+    // Local dev — send via Gmail SMTP
+    const transporter = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 587,
+      secure: false,
+      auth: { user: EMAIL_FROM, pass: process.env.EMAIL_PASS },
+    });
+    await transporter.sendMail({
+      from: EMAIL_FROM,
+      to: toList.join(", "),
+      subject: fullTitle,
+      html: htmlForEmail,
+      text: textForEmail,
+      icalEvent: { filename: "invite.ics", method: "REQUEST", content: icsContent },
+      attachments: [{ filename: pdfFilename, content: pdfBuffer }],
+    });
+  }
 }
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
@@ -124,9 +143,6 @@ app.post("/api/send-email", async (req, res) => {
     const { subject, date, time, message: customMessage, pdfBase64, pdfFilename, recipients } = req.body;
     if (!subject || !date || !time || !pdfBase64 || !pdfFilename) {
       return res.status(400).json({ error: "Subject, date, time and PDF file are required." });
-    }
-    if (!process.env.RESEND_API_KEY) {
-      return res.status(500).json({ error: "RESEND_API_KEY is not configured." });
     }
     await buildAndSendEmail({
       subject, date, time, customMessage,
@@ -147,9 +163,6 @@ app.post("/send-email", upload.single("pdf"), async (req, res) => {
     const file = req.file;
     if (!subject || !date || !time || !file) {
       return res.status(400).json({ error: "Subject, date, time and PDF file are required." });
-    }
-    if (!process.env.RESEND_API_KEY) {
-      return res.status(500).json({ error: "RESEND_API_KEY is not configured." });
     }
     let recipients = [];
     if (typeof rawRecipients === "string") {
