@@ -1,5 +1,5 @@
-import PlaceholderCard from '../components/PlaceholderCard'
+import ComunicadoPage from '../features/comunicado/ComunicadoPage'
 
 export default function Comunicado() {
-  return <PlaceholderCard title="Comunicado" />
+  return <ComunicadoPage />
 }

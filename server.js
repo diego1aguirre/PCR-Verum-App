@@ -8,6 +8,7 @@ import { createClient } from "@supabase/supabase-js";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { existsSync } from "fs";
+import { processComunicado } from "./comunicado-processor.js";
 
 dotenv.config();
 
@@ -213,6 +214,25 @@ app.post("/api/merge-pdf", upload.array("files"), async (req, res) => {
   } catch (err) {
     console.error("Error merging PDFs:", err);
     return res.status(500).json({ error: err.message || "Error al combinar los PDFs." });
+  }
+});
+
+// ─── Comunicado ──────────────────────────────────────────────────────────────
+
+app.post("/api/comunicado", upload.single("file"), async (req, res) => {
+  try {
+    const file = req.file;
+    if (!file) return res.status(400).json({ error: "No se proporcionó ningún archivo." });
+    if (!file.originalname.toLowerCase().endsWith(".docx")) {
+      return res.status(400).json({ error: "Solo se aceptan archivos .docx." });
+    }
+    const { buffer, filename } = await processComunicado(file.buffer, file.originalname);
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.send(buffer);
+  } catch (err) {
+    console.error("Error processing comunicado:", err);
+    return res.status(500).json({ error: err.message || "Error al procesar el documento." });
   }
 });
 

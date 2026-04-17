@@ -1,0 +1,201 @@
+/* ── Comunicado — scoped under co- prefix ────────────────────────────────── */
+
+.co-page {
+  padding: 32px;
+  max-width: 860px;
+  margin: 0 auto;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+.co-page h1 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0 0 4px;
+}
+
+.co-subtitle {
+  font-size: 0.92rem;
+  color: #6b7280;
+  margin: 0 0 28px;
+}
+
+/* ── Card ── */
+.co-card {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  padding: 28px 32px;
+  margin-bottom: 20px;
+}
+
+.co-card-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9ca3af;
+  margin: 0 0 16px;
+}
+
+/* ── Drop zone ── */
+.co-drop-zone {
+  border: 2px dashed #d1d5db;
+  border-radius: 10px;
+  padding: 44px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.18s, background 0.18s;
+}
+
+.co-drop-zone:hover,
+.co-drop-zone.co-drag-over {
+  border-color: #F48220;
+  background: #fff8f2;
+}
+
+.co-drop-icon {
+  font-size: 2.4rem;
+  margin-bottom: 10px;
+}
+
+.co-drop-label {
+  font-size: 0.95rem;
+  color: #374151;
+  margin: 0 0 4px;
+}
+
+.co-drop-hint {
+  font-size: 0.82rem;
+  color: #9ca3af;
+  margin: 0;
+}
+
+.co-drop-zone input[type="file"] {
+  display: none;
+}
+
+/* ── Selected file pill ── */
+.co-file-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 0.88rem;
+  color: #374151;
+}
+
+.co-file-pill-name {
+  max-width: 260px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.co-file-pill-size {
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.co-file-pill-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #9ca3af;
+  padding: 0;
+  font-size: 1rem;
+  line-height: 1;
+  transition: color 0.15s;
+}
+
+.co-file-pill-remove:hover {
+  color: #ef4444;
+}
+
+/* ── Info box ── */
+.co-info {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 0.85rem;
+  color: #0369a1;
+  line-height: 1.5;
+}
+
+.co-info ul {
+  margin: 6px 0 0 16px;
+  padding: 0;
+}
+
+.co-info li {
+  margin-bottom: 2px;
+}
+
+/* ── Submit ── */
+.co-btn-submit {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #F48220;
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 28px;
+  cursor: pointer;
+  transition: background 0.18s, transform 0.1s;
+}
+
+.co-btn-submit:hover:not(:disabled) {
+  background: #d9711a;
+}
+
+.co-btn-submit:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.co-btn-submit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ── Spinner ── */
+.co-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: co-spin 0.65s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes co-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Status messages ── */
+.co-status {
+  margin-top: 14px;
+  font-size: 0.88rem;
+  padding: 10px 14px;
+  border-radius: 8px;
+}
+
+.co-status.co-success {
+  background: #f0fdf4;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+}
+
+.co-status.co-error {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
