@@ -25,13 +25,14 @@ export default function MergePDFPage() {
 
   function addFiles(incoming: FileList | null) {
     if (!incoming) return;
-    const pdfs = Array.from(incoming).filter(
-      (f) => f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf")
-    );
-    if (pdfs.length === 0) return;
+    const accepted = Array.from(incoming).filter((f) => {
+      const name = f.name.toLowerCase();
+      return name.endsWith(".pdf") || name.endsWith(".docx");
+    });
+    if (accepted.length === 0) return;
     setFiles((prev) => [
       ...prev,
-      ...pdfs.map((f) => ({ id: crypto.randomUUID(), file: f })),
+      ...accepted.map((f) => ({ id: crypto.randomUUID(), file: f })),
     ]);
     setStatus(null);
   }
@@ -143,11 +144,11 @@ export default function MergePDFPage() {
           <p className="mp-drop-label">
             Haz clic o arrastra tus archivos PDF aquí
           </p>
-          <p className="mp-drop-hint">Solo archivos .pdf</p>
+          <p className="mp-drop-hint">Archivos .pdf y .docx (los .docx se convierten automáticamente)</p>
           <input
             ref={inputRef}
             type="file"
-            accept=".pdf,application/pdf"
+            accept=".pdf,application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             multiple
             onChange={onInputChange}
           />
@@ -160,7 +161,9 @@ export default function MergePDFPage() {
           <ul className="mp-file-list">
             {files.map(({ id, file }, i) => (
               <li key={id} className="mp-file-item">
-                <span className="mp-file-icon">📎</span>
+                <span className="mp-file-icon">
+                  {file.name.toLowerCase().endsWith(".docx") ? "📝" : "📄"}
+                </span>
                 <span className="mp-file-name">{file.name}</span>
                 <span className="mp-file-size">{formatBytes(file.size)}</span>
                 <div className="mp-file-actions">

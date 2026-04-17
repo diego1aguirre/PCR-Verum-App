@@ -7,8 +7,11 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+type OutputFormat = "docx" | "pdf";
+
 export default function ComunicadoPage() {
   const [file, setFile] = useState<File | null>(null);
+  const [output, setOutput] = useState<OutputFormat>("docx");
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<{ type: "success" | "error"; msg: string } | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -58,6 +61,7 @@ export default function ComunicadoPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
+      formData.append("output", output);
 
       const res = await fetch("/api/comunicado", { method: "POST", body: formData });
 
@@ -66,10 +70,11 @@ export default function ComunicadoPage() {
         throw new Error((json as { error?: string }).error || `Error ${res.status}`);
       }
 
-      // Derive filename from Content-Disposition header if available
       const disposition = res.headers.get("Content-Disposition") || "";
       const match = disposition.match(/filename="?([^"]+)"?/);
-      const filename = match?.[1] ?? `ComPrensa_${file.name.replace(/\.docx$/i, "")}_plain.docx`;
+      const base = file.name.replace(/\.docx$/i, "");
+      const fallbackExt = output === "pdf" ? ".pdf" : "_plain.docx";
+      const filename = match?.[1] ?? `ComPrensa_${base}${fallbackExt}`;
 
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -137,6 +142,35 @@ export default function ComunicadoPage() {
             </button>
           </div>
         )}
+      </div>
+
+      {/* Output format */}
+      <div className="co-card">
+        <p className="co-card-title">Formato de salida</p>
+        <div className="co-format-group">
+          <label className={`co-format-option${output === "docx" ? " co-format-active" : ""}`}>
+            <input
+              type="radio"
+              name="output"
+              value="docx"
+              checked={output === "docx"}
+              onChange={() => setOutput("docx")}
+            />
+            <span className="co-format-icon">📄</span>
+            <span className="co-format-label">Word (.docx)</span>
+          </label>
+          <label className={`co-format-option${output === "pdf" ? " co-format-active" : ""}`}>
+            <input
+              type="radio"
+              name="output"
+              value="pdf"
+              checked={output === "pdf"}
+              onChange={() => setOutput("pdf")}
+            />
+            <span className="co-format-icon">📕</span>
+            <span className="co-format-label">PDF</span>
+          </label>
+        </div>
       </div>
 
       {/* Info */}

@@ -116,6 +116,48 @@
   color: #ef4444;
 }
 
+/* ── Format toggle ── */
+.co-format-group {
+  display: flex;
+  gap: 12px;
+}
+
+.co-format-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  user-select: none;
+}
+
+.co-format-option input[type="radio"] {
+  display: none;
+}
+
+.co-format-option:hover {
+  border-color: #F48220;
+  background: #fff8f2;
+}
+
+.co-format-active {
+  border-color: #F48220;
+  background: #fff8f2;
+}
+
+.co-format-icon {
+  font-size: 1.1rem;
+}
+
+.co-format-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #374151;
+}
+
 /* ── Info box ── */
 .co-info {
   background: #f0f9ff;

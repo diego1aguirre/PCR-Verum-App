@@ -8,7 +8,14 @@ import { createClient } from "@supabase/supabase-js";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { existsSync } from "fs";
+import { writeFile, readFile, rm, mkdir } from "fs/promises";
+import { execFile } from "child_process";
+import { promisify } from "util";
+import { tmpdir } from "os";
+import { randomUUID } from "crypto";
 import { processComunicado } from "./comunicado-processor.js";
+
+const execFileAsync = promisify(execFile);
 
 dotenv.config();
 
@@ -21,6 +28,25 @@ const supabase = createClient(
 
 const app = express();
 const upload = multer({ storage: multer.memoryStorage() });
+
+// ─── LibreOffice DOCX → PDF helper ───────────────────────────────────────────
+
+async function convertDocxToPdf(buffer) {
+  const id = randomUUID();
+  const tempDir = join(tmpdir(), `docx2pdf-${id}`);
+  await mkdir(tempDir, { recursive: true });
+  const inputPath = join(tempDir, "input.docx");
+  try {
+    await writeFile(inputPath, buffer);
+    const soffice = process.env.SOFFICE_PATH || "soffice";
+    await execFileAsync(soffice, [
+      "--headless", "--convert-to", "pdf", "--outdir", tempDir, inputPath,
+    ], { timeout: 60_000 });
+    return await readFile(join(tempDir, "input.pdf"));
+  } finally {
+    await rm(tempDir, { recursive: true, force: true }).catch(() => {});
+  }
+}
 
 const PORT = process.env.PORT || 4000;
 const EMAIL_USER = process.env.EMAIL_USER;   // real sender — used once domain is verified
@@ -180,10 +206,18 @@ app.post("/api/merge-pdf", upload.array("files"), async (req, res) => {
     const rawName = (req.body.outputName ?? "").trim();
     const outputName = rawName ? (rawName.endsWith(".pdf") ? rawName : `${rawName}.pdf`) : "merged.pdf";
 
+    // Convert any .docx files to PDF first
+    const pdfBuffers = await Promise.all(files.map(async (file) => {
+      if (file.originalname.toLowerCase().endsWith(".docx")) {
+        return convertDocxToPdf(file.buffer);
+      }
+      return file.buffer;
+    }));
+
     // Merge all PDFs in order
     const mergedPdf = await PDFDocument.create();
-    for (const file of files) {
-      const pdf = await PDFDocument.load(file.buffer);
+    for (const pdfBuffer of pdfBuffers) {
+      const pdf = await PDFDocument.load(pdfBuffer);
       const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
       pages.forEach((page) => mergedPdf.addPage(page));
     }
@@ -226,10 +260,23 @@ app.post("/api/comunicado", upload.single("file"), async (req, res) => {
     if (!file.originalname.toLowerCase().endsWith(".docx")) {
       return res.status(400).json({ error: "Solo se aceptan archivos .docx." });
     }
-    const { buffer, filename } = await processComunicado(file.buffer, file.originalname);
+
+    const wantPdf = req.body.output === "pdf";
+
+    // Always reformat the docx first
+    const { buffer: docxBuffer, filename: docxFilename } = await processComunicado(file.buffer, file.originalname);
+
+    if (wantPdf) {
+      const pdfBuffer = await convertDocxToPdf(docxBuffer);
+      const pdfFilename = docxFilename.replace(/\.docx$/i, ".pdf");
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${pdfFilename}"`);
+      return res.send(pdfBuffer);
+    }
+
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    res.send(buffer);
+    res.setHeader("Content-Disposition", `attachment; filename="${docxFilename}"`);
+    res.send(docxBuffer);
   } catch (err) {
     console.error("Error processing comunicado:", err);
     return res.status(500).json({ error: err.message || "Error al procesar el documento." });
