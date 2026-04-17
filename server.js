@@ -31,14 +31,39 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 // ─── LibreOffice DOCX → PDF helper ───────────────────────────────────────────
 
+// Candidate paths for the soffice/libreoffice binary (mirrors the Python app's list)
+const _SOFFICE_CANDIDATES = [
+  "soffice",
+  "libreoffice",
+  "/usr/bin/soffice",
+  "/usr/bin/libreoffice",
+  "/usr/lib/libreoffice/program/soffice",
+  "/Applications/LibreOffice.app/Contents/MacOS/soffice", // macOS
+];
+
+async function _findSoffice() {
+  if (process.env.SOFFICE_PATH) return process.env.SOFFICE_PATH;
+  for (const candidate of _SOFFICE_CANDIDATES) {
+    try {
+      await execFileAsync(candidate, ["--version"], { timeout: 5_000 });
+      return candidate;
+    } catch {
+      // not found or not executable — try next
+    }
+  }
+  throw new Error(
+    "LibreOffice not found. Install it or set the SOFFICE_PATH environment variable."
+  );
+}
+
 async function convertDocxToPdf(buffer) {
+  const soffice = await _findSoffice();
   const id = randomUUID();
   const tempDir = join(tmpdir(), `docx2pdf-${id}`);
   await mkdir(tempDir, { recursive: true });
   const inputPath = join(tempDir, "input.docx");
   try {
     await writeFile(inputPath, buffer);
-    const soffice = process.env.SOFFICE_PATH || "soffice";
     await execFileAsync(soffice, [
       "--headless", "--convert-to", "pdf", "--outdir", tempDir, inputPath,
     ], { timeout: 60_000 });
@@ -292,4 +317,8 @@ if (existsSync(distPath)) {
 
 app.listen(PORT, () => {
   console.log(`Server listening on http://localhost:${PORT}`);
+  // Log LibreOffice availability at startup
+  _findSoffice()
+    .then((p) => console.log(`LibreOffice found: ${p}`))
+    .catch(() => console.warn("LibreOffice not found — PDF conversion will be unavailable."));
 });
