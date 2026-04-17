@@ -1,5 +1,5 @@
-import PlaceholderCard from '../components/PlaceholderCard'
+import MergePDFPage from '../features/merge-pdf/MergePDFPage'
 
 export default function MergePDF() {
-  return <PlaceholderCard title="Merge PDF" />
+  return <MergePDFPage />
 }

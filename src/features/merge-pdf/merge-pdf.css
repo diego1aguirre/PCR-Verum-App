@@ -1,0 +1,274 @@
+/* ── Merge PDF — scoped under mp- prefix ─────────────────────────────────── */
+
+.mp-page {
+  padding: 32px;
+  max-width: 860px;
+  margin: 0 auto;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+.mp-page h1 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0 0 4px;
+}
+
+.mp-page .mp-subtitle {
+  font-size: 0.92rem;
+  color: #6b7280;
+  margin: 0 0 28px;
+}
+
+/* ── Card ── */
+.mp-card {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  padding: 28px 32px;
+  margin-bottom: 20px;
+}
+
+.mp-card-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9ca3af;
+  margin: 0 0 16px;
+}
+
+/* ── Drop zone ── */
+.mp-drop-zone {
+  border: 2px dashed #d1d5db;
+  border-radius: 10px;
+  padding: 36px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.18s, background 0.18s;
+  position: relative;
+}
+
+.mp-drop-zone:hover,
+.mp-drop-zone.mp-drag-over {
+  border-color: #F48220;
+  background: #fff8f2;
+}
+
+.mp-drop-icon {
+  font-size: 2.2rem;
+  margin-bottom: 10px;
+}
+
+.mp-drop-label {
+  font-size: 0.95rem;
+  color: #374151;
+  margin: 0 0 4px;
+}
+
+.mp-drop-hint {
+  font-size: 0.82rem;
+  color: #9ca3af;
+  margin: 0;
+}
+
+.mp-drop-zone input[type="file"] {
+  display: none;
+}
+
+/* ── File list ── */
+.mp-file-list {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mp-file-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.mp-file-icon {
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.mp-file-name {
+  flex: 1;
+  font-size: 0.88rem;
+  color: #374151;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mp-file-size {
+  font-size: 0.78rem;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.mp-file-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.mp-btn-icon {
+  background: none;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: #6b7280;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  padding: 0;
+}
+
+.mp-btn-icon:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+  color: #374151;
+}
+
+.mp-btn-icon.mp-btn-remove:hover {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #ef4444;
+}
+
+.mp-btn-icon:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* ── Options ── */
+.mp-options {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mp-option-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mp-option-row label {
+  font-size: 0.9rem;
+  color: #374151;
+  font-weight: 500;
+}
+
+/* Checkbox */
+.mp-checkbox {
+  width: 18px;
+  height: 18px;
+  accent-color: #F48220;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* Text input */
+.mp-input {
+  flex: 1;
+  max-width: 320px;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: #374151;
+  outline: none;
+  transition: border-color 0.18s, box-shadow 0.18s;
+}
+
+.mp-input:focus {
+  border-color: #F48220;
+  box-shadow: 0 0 0 3px rgba(244, 130, 32, 0.15);
+}
+
+/* ── Submit ── */
+.mp-btn-submit {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #F48220;
+  color: #ffffff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 28px;
+  cursor: pointer;
+  transition: background 0.18s, transform 0.1s;
+}
+
+.mp-btn-submit:hover:not(:disabled) {
+  background: #d9711a;
+}
+
+.mp-btn-submit:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.mp-btn-submit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ── Spinner ── */
+.mp-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: mp-spin 0.65s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes mp-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Status messages ── */
+.mp-status {
+  margin-top: 14px;
+  font-size: 0.88rem;
+  padding: 10px 14px;
+  border-radius: 8px;
+}
+
+.mp-status.mp-success {
+  background: #f0fdf4;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+}
+
+.mp-status.mp-error {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+}
+
+/* ── Empty state ── */
+.mp-empty {
+  font-size: 0.85rem;
+  color: #9ca3af;
+  text-align: center;
+  padding: 8px 0 0;
+}

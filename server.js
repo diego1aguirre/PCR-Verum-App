@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import multer from "multer";
 import { Resend } from "resend";
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import dotenv from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { fileURLToPath } from "url";
@@ -162,6 +163,56 @@ app.post("/send-email", upload.single("pdf"), async (req, res) => {
   } catch (err) {
     console.error("Error sending email:", err);
     return res.status(500).json({ error: err.message || "Failed to send email." });
+  }
+});
+
+// ─── Merge PDF ───────────────────────────────────────────────────────────────
+
+app.post("/api/merge-pdf", upload.array("files"), async (req, res) => {
+  try {
+    const files = req.files;
+    if (!files || files.length < 2) {
+      return res.status(400).json({ error: "Se necesitan al menos 2 archivos PDF." });
+    }
+
+    const addPageNumbers = req.body.addPageNumbers === "true";
+    const rawName = (req.body.outputName ?? "").trim();
+    const outputName = rawName ? (rawName.endsWith(".pdf") ? rawName : `${rawName}.pdf`) : "merged.pdf";
+
+    // Merge all PDFs in order
+    const mergedPdf = await PDFDocument.create();
+    for (const file of files) {
+      const pdf = await PDFDocument.load(file.buffer);
+      const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+      pages.forEach((page) => mergedPdf.addPage(page));
+    }
+
+    // Optionally stamp "Pag. n/total" in the top-right corner
+    if (addPageNumbers) {
+      const font = await mergedPdf.embedFont(StandardFonts.Helvetica);
+      const pages = mergedPdf.getPages();
+      const total = pages.length;
+      const fontSize = 18;
+      pages.forEach((page, i) => {
+        const text = `Pag. ${i + 1}/${total}`;
+        const textWidth = font.widthOfTextAtSize(text, fontSize);
+        page.drawText(text, {
+          x: page.getWidth() - textWidth - 20,
+          y: page.getHeight() - 35,
+          size: fontSize,
+          font,
+          color: rgb(0, 0, 0),
+        });
+      });
+    }
+
+    const mergedBytes = await mergedPdf.save();
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${outputName}"`);
+    res.send(Buffer.from(mergedBytes));
+  } catch (err) {
+    console.error("Error merging PDFs:", err);
+    return res.status(500).json({ error: err.message || "Error al combinar los PDFs." });
   }
 });
 
