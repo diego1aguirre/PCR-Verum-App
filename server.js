@@ -73,10 +73,10 @@ async function convertDocxToPdf(buffer) {
   const id = randomUUID();
   const tempDir = join(tmpdir(), `docx2pdf-${id}`);
 
-  // Create both the working dir and the isolated LO user-profile dir up front
-  // with explicit permissions so LibreOffice can write freely inside Docker.
-  const userInstallDir = join(tempDir, "userinstall");
-  await mkdir(userInstallDir, { recursive: true, mode: 0o755 });
+  // LO 7.4 does not support --user-installation=file://... as a CLI flag.
+  // Instead, point HOME at the temp dir so LO creates its user profile there —
+  // a writable, isolated location that is cleaned up with the rest of tempDir.
+  await mkdir(tempDir, { recursive: true, mode: 0o755 });
 
   const inputPath = join(tempDir, "input.docx");
   try {
@@ -84,19 +84,17 @@ async function convertDocxToPdf(buffer) {
 
     console.log(`[LO] converting ${inputPath} → PDF in ${tempDir}`);
 
-    // --norestore        : skip crash-recovery dialog (would hang headless)
-    // --user-installation: isolate LO user-profile so it doesn't write to a
-    //                      restricted home dir inside Docker
+    // --norestore: skip crash-recovery dialog (would hang headless)
+    // HOME=tempDir: isolate LO user-profile to the per-conversion temp dir
     let stdout = "", stderr = "";
     try {
       ({ stdout, stderr } = await execFileAsync(soffice, [
         "--headless",
         "--norestore",
-        `--user-installation=file://${userInstallDir}`,
         "--convert-to", "pdf",
         "--outdir", tempDir,
         inputPath,
-      ], { timeout: 60_000 }));
+      ], { timeout: 60_000, env: { ...process.env, HOME: tempDir } }));
     } catch (execErr) {
       // execFileAsync rejects on non-zero exit; stdout/stderr are on the error object
       stdout = execErr.stdout ?? "";
