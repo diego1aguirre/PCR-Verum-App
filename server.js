@@ -91,7 +91,8 @@ async function convertDocxToPdf(buffer) {
       ({ stdout, stderr } = await execFileAsync(soffice, [
         "--headless",
         "--norestore",
-        "--convert-to", "pdf",
+        "--infilter=Microsoft Word 2007-2019 XML",
+        "--convert-to", "pdf:writer_pdf_Export",
         "--outdir", tempDir,
         inputPath,
       ], { timeout: 60_000, env: { ...process.env, HOME: tempDir } }));
