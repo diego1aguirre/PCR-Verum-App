@@ -1,4 +1,6 @@
 import { NavLink } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
+import { supabase } from '../lib/supabase'
 
 const SIDEBAR_WIDTH = 210
 
@@ -149,10 +151,24 @@ const ajustes: NavItem[] = [
   { to: '/configuracion', label: 'Configuración', icon: <IconSettings /> },
 ]
 
-const USER_NAME = 'Diego Aguirre'
-const USER_INITIALS = 'DA'
+function getInitials(email: string): string {
+  const local = email.split("@")[0]
+  const parts = local.split(/[._-]/)
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase()
+  }
+  return local.slice(0, 2).toUpperCase()
+}
 
 export default function Sidebar() {
+  const { session } = useAuth()
+  const email = session?.user?.email ?? ""
+  const initials = email ? getInitials(email) : "?"
+
+  async function handleSignOut() {
+    await supabase.auth.signOut()
+  }
+
   return (
     <aside style={styles.sidebar}>
       <div style={styles.logoWrapper}>
@@ -180,8 +196,31 @@ export default function Sidebar() {
       </nav>
 
       <div style={styles.footer}>
-        <div style={styles.avatar}>{USER_INITIALS}</div>
-        <span style={styles.userName}>{USER_NAME}</span>
+        <div style={styles.avatar}>{initials}</div>
+        <span style={{ ...styles.userName, flex: 1, minWidth: 0 }}>{email}</span>
+        <button
+          onClick={handleSignOut}
+          title="Cerrar sesión"
+          style={{
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            color: "#9ca3af",
+            padding: 4,
+            display: "flex",
+            alignItems: "center",
+            flexShrink: 0,
+            transition: "color 0.15s",
+          }}
+          onMouseEnter={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#ef4444")}
+          onMouseLeave={(e) => ((e.currentTarget as HTMLButtonElement).style.color = "#9ca3af")}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+        </button>
       </div>
     </aside>
   )
