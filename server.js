@@ -72,22 +72,55 @@ async function convertDocxToPdf(buffer) {
   const soffice = await _findSoffice();
   const id = randomUUID();
   const tempDir = join(tmpdir(), `docx2pdf-${id}`);
-  await mkdir(tempDir, { recursive: true });
+
+  // Create both the working dir and the isolated LO user-profile dir up front
+  // with explicit permissions so LibreOffice can write freely inside Docker.
+  const userInstallDir = join(tempDir, "userinstall");
+  await mkdir(userInstallDir, { recursive: true, mode: 0o755 });
+
   const inputPath = join(tempDir, "input.docx");
   try {
     await writeFile(inputPath, buffer);
-    // --norestore   : skip crash-recovery dialog (would hang headless)
-    // --user-installation : isolate the LO user-profile to the temp dir so
-    //   LibreOffice doesn't try to write to a read-only home in Docker
-    await execFileAsync(soffice, [
-      "--headless",
-      "--norestore",
-      `--user-installation=file://${tempDir}/userinstall`,
-      "--convert-to", "pdf",
-      "--outdir", tempDir,
-      inputPath,
-    ], { timeout: 60_000 });
-    return await readFile(join(tempDir, "input.pdf"));
+
+    console.log(`[LO] converting ${inputPath} → PDF in ${tempDir}`);
+
+    // --norestore        : skip crash-recovery dialog (would hang headless)
+    // --user-installation: isolate LO user-profile so it doesn't write to a
+    //                      restricted home dir inside Docker
+    let stdout = "", stderr = "";
+    try {
+      ({ stdout, stderr } = await execFileAsync(soffice, [
+        "--headless",
+        "--norestore",
+        `--user-installation=file://${userInstallDir}`,
+        "--convert-to", "pdf",
+        "--outdir", tempDir,
+        inputPath,
+      ], { timeout: 60_000 }));
+    } catch (execErr) {
+      // execFileAsync rejects on non-zero exit; stdout/stderr are on the error object
+      stdout = execErr.stdout ?? "";
+      stderr = execErr.stderr ?? "";
+      console.error("[LO] process exited with error:");
+      console.error(`  exit code : ${execErr.code ?? "unknown"}`);
+      console.error(`  stdout    : ${stdout || "(empty)"}`);
+      console.error(`  stderr    : ${stderr || "(empty)"}`);
+      throw execErr;
+    }
+
+    console.log(`[LO] stdout: ${stdout || "(empty)"}`);
+    if (stderr) console.warn(`[LO] stderr: ${stderr}`);
+
+    // Confirm the output file was actually produced before trying to read it
+    const outputPath = join(tempDir, "input.pdf");
+    try {
+      return await readFile(outputPath);
+    } catch {
+      console.error(`[LO] output PDF not found at ${outputPath}`);
+      console.error(`[LO] stdout was: ${stdout || "(empty)"}`);
+      console.error(`[LO] stderr was: ${stderr || "(empty)"}`);
+      throw new Error("LibreOffice ran but did not produce a PDF. Check Railway logs for details.");
+    }
   } finally {
     await rm(tempDir, { recursive: true, force: true }).catch(() => {});
   }
