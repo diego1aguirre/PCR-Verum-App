@@ -31,24 +31,36 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 // ─── LibreOffice DOCX → PDF helper ───────────────────────────────────────────
 
-// Candidate paths for the soffice/libreoffice binary (mirrors the Python app's list)
+// Candidate paths tried in order. apt installs soffice at /usr/bin/soffice
+// (a wrapper script) and the real binary at /usr/lib/libreoffice/program/soffice.
 const _SOFFICE_CANDIDATES = [
-  "soffice",
-  "libreoffice",
-  "/usr/bin/soffice",
+  "/usr/bin/soffice",                              // Debian/Ubuntu apt (Railway)
+  "/usr/lib/libreoffice/program/soffice",          // Debian/Ubuntu real binary
   "/usr/bin/libreoffice",
-  "/usr/lib/libreoffice/program/soffice",
-  "/Applications/LibreOffice.app/Contents/MacOS/soffice", // macOS
+  "/Applications/LibreOffice.app/Contents/MacOS/soffice", // macOS dev
+  "soffice",                                       // PATH fallback
+  "libreoffice",
 ];
 
+// Cache the resolved path after the first successful lookup.
+let _sofficePath = null;
+
 async function _findSoffice() {
-  if (process.env.SOFFICE_PATH) return process.env.SOFFICE_PATH;
+  if (_sofficePath) return _sofficePath;
+  if (process.env.SOFFICE_PATH) {
+    _sofficePath = process.env.SOFFICE_PATH;
+    return _sofficePath;
+  }
   for (const candidate of _SOFFICE_CANDIDATES) {
     try {
-      await execFileAsync(candidate, ["--version"], { timeout: 5_000 });
-      return candidate;
-    } catch {
-      // not found or not executable — try next
+      const { stdout } = await execFileAsync(candidate, ["--version"], { timeout: 5_000 });
+      console.log(`LibreOffice found at: ${candidate} — ${stdout.trim()}`);
+      _sofficePath = candidate;
+      return _sofficePath;
+    } catch (err) {
+      // ENOENT = binary not at this path; other errors = binary exists but failed
+      const reason = err.code === "ENOENT" ? "not found" : `error: ${err.message}`;
+      console.log(`LibreOffice candidate skipped (${candidate}): ${reason}`);
     }
   }
   throw new Error(
@@ -64,8 +76,16 @@ async function convertDocxToPdf(buffer) {
   const inputPath = join(tempDir, "input.docx");
   try {
     await writeFile(inputPath, buffer);
+    // --norestore   : skip crash-recovery dialog (would hang headless)
+    // --user-installation : isolate the LO user-profile to the temp dir so
+    //   LibreOffice doesn't try to write to a read-only home in Docker
     await execFileAsync(soffice, [
-      "--headless", "--convert-to", "pdf", "--outdir", tempDir, inputPath,
+      "--headless",
+      "--norestore",
+      `--user-installation=file://${tempDir}/userinstall`,
+      "--convert-to", "pdf",
+      "--outdir", tempDir,
+      inputPath,
     ], { timeout: 60_000 });
     return await readFile(join(tempDir, "input.pdf"));
   } finally {
