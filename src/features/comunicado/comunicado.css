@@ -134,8 +134,40 @@
   user-select: none;
 }
 
-.co-format-option input[type="radio"] {
+.co-format-option input[type="radio"],
+.co-format-option input[type="checkbox"] {
   display: none;
+}
+
+/* ── Filename row ── */
+.co-filename-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.co-filename-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #374151;
+  white-space: nowrap;
+}
+
+.co-input {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  color: #231F20;
+  outline: none;
+  transition: border-color 0.15s;
+  font-family: inherit;
+}
+
+.co-input:focus {
+  border-color: #F48220;
 }
 
 .co-format-option:hover {

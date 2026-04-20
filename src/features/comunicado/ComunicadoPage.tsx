@@ -7,11 +7,22 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-type OutputFormat = "docx" | "pdf";
+function triggerDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
 
 export default function ComunicadoPage() {
   const [file, setFile] = useState<File | null>(null);
-  const [output, setOutput] = useState<OutputFormat>("docx");
+  const [wantDocx, setWantDocx] = useState(true);
+  const [wantPdf, setWantPdf] = useState(false);
+  const [filename, setFilename] = useState("ComPrensa_");
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<{ type: "success" | "error"; msg: string } | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -55,37 +66,37 @@ export default function ComunicadoPage() {
 
   async function handleProcess() {
     if (!file) return;
+    if (!wantDocx && !wantPdf) {
+      setStatus({ type: "error", msg: "Selecciona al menos un formato de salida." });
+      return;
+    }
+
     setLoading(true);
     setStatus(null);
 
-    try {
+    const name = filename.trim() || "ComPrensa_";
+
+    async function fetchFormat(outputFormat: "docx" | "pdf"): Promise<Blob> {
       const formData = new FormData();
-      formData.append("file", file);
-      formData.append("output", output);
-
+      formData.append("file", file!);
+      formData.append("output", outputFormat);
       const res = await fetch("/api/comunicado", { method: "POST", body: formData });
-
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
         throw new Error((json as { error?: string }).error || `Error ${res.status}`);
       }
+      return res.blob();
+    }
 
-      const disposition = res.headers.get("Content-Disposition") || "";
-      const match = disposition.match(/filename="?([^"]+)"?/);
-      const base = file.name.replace(/\.docx$/i, "");
-      const fallbackExt = output === "pdf" ? ".pdf" : "_plain.docx";
-      const filename = match?.[1] ?? `ComPrensa_${base}${fallbackExt}`;
-
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-
+    try {
+      if (wantDocx) {
+        const blob = await fetchFormat("docx");
+        triggerDownload(blob, `${name}.docx`);
+      }
+      if (wantPdf) {
+        const blob = await fetchFormat("pdf");
+        triggerDownload(blob, `${name}.pdf`);
+      }
       setStatus({ type: "success", msg: "¡Documento procesado y descargado con éxito!" });
     } catch (err) {
       setStatus({
@@ -144,47 +155,51 @@ export default function ComunicadoPage() {
         )}
       </div>
 
-      {/* Output format */}
+      {/* Output format + filename */}
       <div className="co-card">
         <p className="co-card-title">Formato de salida</p>
         <div className="co-format-group">
-          <label className={`co-format-option${output === "docx" ? " co-format-active" : ""}`}>
+          <label className={`co-format-option${wantDocx ? " co-format-active" : ""}`}>
             <input
-              type="radio"
-              name="output"
-              value="docx"
-              checked={output === "docx"}
-              onChange={() => setOutput("docx")}
+              type="checkbox"
+              checked={wantDocx}
+              onChange={(e) => setWantDocx(e.target.checked)}
             />
             <span className="co-format-icon">📄</span>
-            <span className="co-format-label">Word (.docx)</span>
+            <span className="co-format-label">Versión lisa (.docx)</span>
           </label>
-          <label className={`co-format-option${output === "pdf" ? " co-format-active" : ""}`}>
+          <label className={`co-format-option${wantPdf ? " co-format-active" : ""}`}>
             <input
-              type="radio"
-              name="output"
-              value="pdf"
-              checked={output === "pdf"}
-              onChange={() => setOutput("pdf")}
+              type="checkbox"
+              checked={wantPdf}
+              onChange={(e) => setWantPdf(e.target.checked)}
             />
             <span className="co-format-icon">📕</span>
             <span className="co-format-label">PDF</span>
           </label>
         </div>
-      </div>
 
-      {/* Info */}
-      <div className="co-card">
-        <p className="co-card-title">¿Qué hace?</p>
-        <div className="co-info">
-          El procesador lee tu comunicado y genera una versión limpia con:
-          <ul>
-            <li>Fuente <strong>Aptos 12pt</strong></li>
-            <li>Texto <strong>justificado</strong></li>
-            <li>Interlineado simple, sin espaciado entre párrafos</li>
-            <li>Párrafo vacío separador entre cada bloque de contenido</li>
-            <li>Tablas de calificación y analistas procesadas automáticamente</li>
-          </ul>
+        <div className="co-filename-row">
+          <label className="co-filename-label" htmlFor="co-filename">
+            Nombre del archivo:
+          </label>
+          <input
+            id="co-filename"
+            type="text"
+            className="co-input"
+            value={filename}
+            onChange={(e) => {
+              // Always keep the ComPrensa_ prefix
+              const val = e.target.value;
+              if (!val.startsWith("ComPrensa_")) {
+                setFilename("ComPrensa_");
+              } else {
+                setFilename(val);
+              }
+            }}
+            placeholder="ComPrensa_"
+            spellCheck={false}
+          />
         </div>
       </div>
 

@@ -136,7 +136,7 @@ function extractItems(docXml) {
 function makePlainParagraph(text) {
   return new Paragraph({
     children: text
-      ? [new TextRun({ text, font: "Aptos", size: 24 })] // 24 half-points = 12pt
+      ? [new TextRun({ text, font: "Calibri", size: 24 })] // 24 half-points = 12pt
       : [],
     alignment: AlignmentType.JUSTIFIED,
     spacing: { before: 0, after: 0, line: 240, lineRule: "auto" },
@@ -183,7 +183,7 @@ export async function processComunicado(buffer, originalName) {
   const doc = new Document({
     styles: {
       default: {
-        document: { run: { font: "Aptos", size: 24 } },
+        document: { run: { font: "Calibri", size: 24 } },
       },
     },
     sections: [{ children: paragraphs }],
