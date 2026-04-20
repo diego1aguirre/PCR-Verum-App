@@ -339,17 +339,17 @@ app.post("/api/comunicado", upload.single("file"), async (req, res) => {
 
     const wantPdf = req.body.output === "pdf";
 
-    // Always reformat the docx first
-    const { buffer: docxBuffer, filename: docxFilename } = await processComunicado(file.buffer, file.originalname);
-
     if (wantPdf) {
-      const pdfBuffer = await convertDocxToPdf(docxBuffer);
-      const pdfFilename = docxFilename.replace(/\.docx$/i, ".pdf");
+      // PDF = original uploaded file converted as-is (no reformatting)
+      const pdfBuffer = await convertDocxToPdf(file.buffer);
+      const pdfFilename = file.originalname.replace(/\.docx$/i, ".pdf");
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename="${pdfFilename}"`);
       return res.send(pdfBuffer);
     }
 
+    // DOCX = reformatted version
+    const { buffer: docxBuffer, filename: docxFilename } = await processComunicado(file.buffer, file.originalname);
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
     res.setHeader("Content-Disposition", `attachment; filename="${docxFilename}"`);
     res.send(docxBuffer);
