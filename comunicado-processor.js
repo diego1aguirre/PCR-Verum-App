@@ -16,6 +16,9 @@ import { Document, Paragraph, TextRun, AlignmentType, Packer } from "docx";
 import path from "path";
 
 const W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+
+// Styles that act as section headers — no empty separator is inserted
+// between them and the immediately-following sub-item paragraph.
 const HEADER_STYLES = new Set(["MetodologasyAnalistas", "MetodologíasyAnalistas"]);
 
 // ── XML helpers ──────────────────────────────────────────────────────────────
@@ -60,7 +63,7 @@ function extractItems(docXml) {
   const body = bodies[0];
 
   const items = [];
-  let prevWasHeader = false;
+  let prevWasHeader = false; // tracks whether the last non-blank body para was a header style
 
   for (let i = 0; i < body.childNodes.length; i++) {
     const child = body.childNodes[i];
@@ -68,26 +71,32 @@ function extractItems(docXml) {
 
     const localName = child.localName;
 
-    // ── Paragraph ──────────────────────────────────────────────────────────
+    // ── Body paragraph ────────────────────────────────────────────────
     if (localName === "p") {
       const text = getParaText(child);
       const stripped = text.trim();
       const style = getParaStyle(child);
 
       if (stripped) {
+        // List items (numPr) get a dash-tab prefix matching the original format
         const itemText = paraIsListItem(child) ? "-\t" + stripped : stripped;
         items.push({ text: itemText, blank: false, afterHeader: prevWasHeader, suppressSep: false });
         prevWasHeader = HEADER_STYLES.has(style);
       } else {
-        // Preserve source blank paragraphs
+        // Preserve source empty paragraphs (they carry intentional spacing)
         items.push({ text: text, blank: true, afterHeader: false, suppressSep: false });
         // Don't reset prevWasHeader on blank lines
       }
 
-    // ── Table ───────────────────────────────────────────────────────────────
+    // ── Table ─────────────────────────────────────────────────────────
     } else if (localName === "tbl") {
       if (tableIsMultiPara(child)) {
-        // Analyst-style: 1 row × N columns, each column has multiple paragraphs
+        // Analyst-style table: 1 row × N columns, each column has
+        // multiple paragraphs (name / title / phone / email).
+        // Output: each paragraph in each cell on its own line,
+        // with a blank separator between cells (analysts).
+        // suppressSep=true on lines 2+ within a cell so the
+        // auto-separator logic doesn't insert blanks inside the block.
         const trs = child.getElementsByTagNameNS(W_NS, "tr");
         for (let r = 0; r < trs.length; r++) {
           const tcs = trs[r].getElementsByTagNameNS(W_NS, "tc");
@@ -95,18 +104,20 @@ function extractItems(docXml) {
             const paras = tcs[c].getElementsByTagNameNS(W_NS, "p");
             const cellLines = [];
             for (let p = 0; p < paras.length; p++) {
-              const t = getParaText(paras[p]);
+              const t = getParaText(paras[p]); // preserve leading spaces intentionally
               if (t.trim()) cellLines.push(t);
             }
             cellLines.forEach((line, idx) => {
               items.push({ text: line, blank: false, afterHeader: false, suppressSep: idx > 0 });
             });
-            // Blank separator between analysts (also after the last one)
+            // Blank between analysts (also acts as trailing blank after last)
             items.push({ text: "", blank: true, afterHeader: false, suppressSep: false });
           }
         }
       } else {
-        // Rating-style: N rows × M columns, single paragraph per cell
+        // Rating-style table: N rows × M columns, single paragraph per cell.
+        // Join cells per row WITHOUT stripping individual cells (preserves
+        // intentional whitespace like '   -'), then strip the whole row.
         const trs = child.getElementsByTagNameNS(W_NS, "tr");
         for (let r = 0; r < trs.length; r++) {
           const tcs = trs[r].getElementsByTagNameNS(W_NS, "tc");
@@ -115,9 +126,13 @@ function extractItems(docXml) {
             const paras = tcs[c].getElementsByTagNameNS(W_NS, "p");
             rowParts.push(paras[0] ? getParaText(paras[0]) : "");
           }
+          // Join non-empty cells with double-tab so columns are visually
+          // separated (matches the original ComPrensa table layout).
           const nonEmpty = rowParts.filter((p) => p.trim());
           const rowText = nonEmpty.join("\t\t").trim();
           if (rowText) {
+            // First row: allow auto-separator before it (separates from preceding content).
+            // Subsequent rows: suppressSep keeps them consecutive with no blank between.
             items.push({ text: rowText, blank: false, afterHeader: false, suppressSep: r > 0 });
           }
         }
@@ -136,11 +151,42 @@ function extractItems(docXml) {
 function makePlainParagraph(text) {
   return new Paragraph({
     children: text
-      ? [new TextRun({ text, font: "Calibri", size: 24 })] // 24 half-points = 12pt
+      ? [new TextRun({ text, font: "Aptos", size: 24 })] // 24 half-points = 12pt
       : [],
     alignment: AlignmentType.JUSTIFIED,
     spacing: { before: 0, after: 0, line: 240, lineRule: "auto" },
   });
+}
+
+// Post-process the generated .docx buffer to inject the w:asciiTheme /
+// w:hAnsiTheme attributes that python-docx writes explicitly:
+//   rFonts.set(qn('w:asciiTheme'), 'minorHAnsi')
+//   rFonts.set(qn('w:hAnsiTheme'), 'minorHAnsi')
+// The 'docx' npm package has no API for these, so we add them directly
+// to the XML after Packer.toBuffer() produces the zip.
+async function injectAptosThemeAttributes(docxBuffer) {
+  const zip = await JSZip.loadAsync(docxBuffer);
+
+  for (const filePath of ["word/document.xml", "word/styles.xml"]) {
+    const entry = zip.file(filePath);
+    if (!entry) continue;
+
+    let xml = await entry.async("string");
+
+    // Find every self-closing <w:rFonts .../> that already carries
+    // w:ascii="Aptos" and add the theme attributes if they are absent.
+    xml = xml.replace(/<w:rFonts([^/]*?)\/>/g, (match, attrs) => {
+      if (!attrs.includes('w:ascii="Aptos"')) return match;
+      let a = attrs;
+      if (!a.includes("w:asciiTheme")) a += ' w:asciiTheme="minorHAnsi"';
+      if (!a.includes("w:hAnsiTheme")) a += ' w:hAnsiTheme="minorHAnsi"';
+      return `<w:rFonts${a}/>`;
+    });
+
+    zip.file(filePath, xml);
+  }
+
+  return zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE" });
 }
 
 function buildOutputFilename(originalName) {
@@ -163,15 +209,21 @@ export async function processComunicado(buffer, originalName) {
   }
 
   const paragraphs = [];
-  let prevWasContent = false;
+  let prevWasContent = false; // last written item was a non-blank paragraph
 
   for (const item of items) {
     if (item.blank) {
+      // Write source blank lines through only if we've already started writing
       if (prevWasContent || paragraphs.length > 0) {
         paragraphs.push(makePlainParagraph(item.text));
       }
       prevWasContent = false;
     } else {
+      // Before each content paragraph, insert an empty separator UNLESS:
+      //   - nothing written yet (first paragraph)
+      //   - the last thing written was already a blank
+      //   - this paragraph immediately follows a section header
+      //   - suppress_sep is set (consecutive lines within a table cell)
       if (prevWasContent && !item.afterHeader && !item.suppressSep) {
         paragraphs.push(makePlainParagraph(""));
       }
@@ -183,12 +235,19 @@ export async function processComunicado(buffer, originalName) {
   const doc = new Document({
     styles: {
       default: {
-        document: { run: { font: "Calibri", size: 24 } },
+        // Mirror: out_doc.styles['Normal'].font.name = 'Aptos'
+        //         out_doc.styles['Normal'].font.size = Pt(12)
+        document: { run: { font: "Aptos", size: 24 } },
       },
     },
     sections: [{ children: paragraphs }],
   });
 
-  const outBuffer = await Packer.toBuffer(doc);
+  const rawBuffer = await Packer.toBuffer(doc);
+
+  // Inject w:asciiTheme / w:hAnsiTheme into every w:rFonts element —
+  // mirrors the explicit XML manipulation python-docx performs.
+  const outBuffer = await injectAptosThemeAttributes(rawBuffer);
+
   return { buffer: outBuffer, filename: buildOutputFilename(originalName) };
 }
